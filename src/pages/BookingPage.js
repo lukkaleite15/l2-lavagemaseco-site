@@ -1,6 +1,23 @@
 import React, { useState } from 'react';
 import { Calendar, Clock, User, Phone, Car, CheckCircle } from 'lucide-react';
 
+// Componentes visuais integrados para evitar erros de pasta
+const Button = ({ children, className = '', ...props }) => (
+  <button className={`w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 mt-6 ${className}`} {...props}>
+    {children}
+  </button>
+);
+
+const Input = ({ className = '', ...props }) => (
+  <input className={`mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm ${className}`} {...props} />
+);
+
+const Select = ({ className = '', children, ...props }) => (
+  <select className={`mt-1 block w-full px-3 py-2 border border-gray-300 bg-white rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm ${className}`} {...props}>
+    {children}
+  </select>
+);
+
 export default function BookingPage() {
   const [form, setForm] = useState({ name: '', phone: '', date: '', time: '', service: 'lavagem-simples' });
   const [success, setSuccess] = useState(false);
@@ -30,10 +47,9 @@ export default function BookingPage() {
               <label className="block text-sm font-medium text-gray-700 flex items-center gap-2">
                 <User size={16} /> Nome Completo
               </label>
-              <input
+              <Input
                 type="text"
                 required
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm"
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
               />
@@ -43,10 +59,9 @@ export default function BookingPage() {
               <label className="block text-sm font-medium text-gray-700 flex items-center gap-2">
                 <Phone size={16} /> Telefone / WhatsApp
               </label>
-              <input
+              <Input
                 type="tel"
                 required
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm"
                 value={form.phone}
                 onChange={(e) => setForm({ ...form, phone: e.target.value })}
               />
@@ -56,15 +71,14 @@ export default function BookingPage() {
               <label className="block text-sm font-medium text-gray-700 flex items-center gap-2">
                 <Car size={16} /> Tipo de Serviço
               </label>
-              <select
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 bg-white rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm"
+              <Select
                 value={form.service}
                 onChange={(e) => setForm({ ...form, service: e.target.value })}
               >
                 <option value="lavagem-simples">Lavagem Ecológica Simples</option>
                 <option value="lavagem-completa">Lavagem a Seco Completa + Higienização</option>
                 <option value="polimento">Polimento Comercial</option>
-              </select>
+              </Select>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
@@ -72,10 +86,9 @@ export default function BookingPage() {
                 <label className="block text-sm font-medium text-gray-700 flex items-center gap-2">
                   <Calendar size={16} /> Data
                 </label>
-                <input
+                <Input
                   type="date"
                   required
-                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm"
                   value={form.date}
                   onChange={(e) => setForm({ ...form, date: e.target.value })}
                 />
@@ -85,25 +98,22 @@ export default function BookingPage() {
                 <label className="block text-sm font-medium text-gray-700 flex items-center gap-2">
                   <Clock size={16} /> Horário
                 </label>
-                <input
+                <Input
                   type="time"
                   required
-                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm"
                   value={form.time}
                   onChange={(e) => setForm({ ...form, time: e.target.value })}
                 />
               </div>
             </div>
 
-            <button
-              type="submit"
-              className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 mt-6"
-            >
+            <Button type="submit">
               Confirmar Agendamento
-            </button>
+            </Button>
           </form>
         )}
       </div>
     </div>
   );
-                    }
+    }
+                  
