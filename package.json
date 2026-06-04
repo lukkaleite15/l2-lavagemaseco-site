@@ -1,9 +1,9 @@
 {
-  "name": "l2-lavagem-site",
-  "version": "1.0.0",
+  "name": "l2-lavagemaseco-site",
+  "version": "0.1.0",
   "private": true,
   "dependencies": {
-    "@supabase/supabase-js": "^2.39.0",
+    "lucide-react": "^0.300.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-scripts": "5.0.1"
@@ -13,6 +13,12 @@
     "build": "react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
+  },
+  "eslintConfig": {
+    "extends": [
+      "react-app",
+      "react-app/jest"
+    ]
   },
   "browserslist": {
     "production": [
@@ -27,4 +33,3 @@
     ]
   }
 }
-
