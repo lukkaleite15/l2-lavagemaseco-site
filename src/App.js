@@ -24,12 +24,32 @@ const USERS_KEY   = "l2_registered_users";
 
 async function loadAllBookings() {
   try {
+    let list = [];
     if (window.storage && window.storage.get) {
       const r = await window.storage.get(STORAGE_KEY, true);
-      return r ? JSON.parse(r.value) : [];
+      list = r ? JSON.parse(r.value) : [];
+    } else {
+      const local = localStorage.getItem(STORAGE_KEY);
+      list = local ? JSON.parse(local) : [];
     }
-    const local = localStorage.getItem(STORAGE_KEY);
-    return local ? JSON.parse(local) : [];
+
+    // --- Cancelamento automático de agendamentos expirados ---
+    const agora = new Date();
+    const listFiltrada = list.filter(booking => {
+      if (!booking.date || !booking.time) return true;
+      const dataAgendamento = new Date(`${booking.date}T${booking.time}`);
+      return dataAgendamento >= agora;
+    });
+
+    if (list.length !== listFiltrada.length) {
+      if (window.storage && window.storage.set) {
+        await window.storage.set(STORAGE_KEY, JSON.stringify(listFiltrada), true);
+      } else {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(listFiltrada));
+      }
+    }
+
+    return listFiltrada;
   } catch { return []; }
 }
 
@@ -81,11 +101,11 @@ function getUsersFromStorage() {
   } catch { return []; }
 }
 
-const LOGO_B64 = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAAAAAAD/2wBDAA0JCgsKCA0LCgsODg0PEyAVExISEyccHhcgLikxMC4pLSwzOko+MzZGNywtQFdBRkxOUlNSMj5aYVpQYEpRUk//2wBDAQ4ODhMREyYVFSZPNS01T09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT0//wAARCAB4AHgDASIAAhEBAxEB/8QAGwABAAIDAQEAAAAAAAAAAAAAAAEFAgQGAwf/xAA7EAABBAECAgU集中/8QAGgEBAAMBAQEAAAAAAAAAAAAAAAEDBAUCBv/EADMRAAEDAgMFBQYHAAAAAAAAAAEAAgMEERIhMQUTUWHwFDJBcYFSU6Gx0eEVIiM0VMHx/9oAMBAAIRAxEAPwD5giIiKURetWHziwyLOOI7nwUE2FyvbGF7g0aleSLonup0Yw1zWgHkMZJXl1lR9h34Aqcomput2ZHOOgPU3YcZ4mn2cfwobcsVnhl6McJOBI3krBYTRNmidG8Za4YWMSA5OGS+kdSPYMUTzi5m4Pn9l6wBr5Yxza4j4hXPldRq6drZr04uji6JruHJO5z3rmdCkcfsX84ZA34ZXXeXn+ZD/0M/VSWYWuHkqo6kyzROGQIdcc8vktLQ6enzMs29UscMFduehY4B8p7h4fut2xQ0rUNBs6lpcM1V9RwEkUj+IOB9ef/AHJUFeCW1YZBAwvkkPC1o9ZXQ63LBoujjyfqvElmUiS5IOQ9YaPkPh70ZYtNxklVjbM3A84iRl4AeN1xOo2TUtQyhvFljgRnGeS13azIR2IWg95OVOu+lD7j+iqlpiiY5gJC49fWzw1D2RusPsF62LEth/HK7J5DuC8FksVoAAyC4r3OecTjclERFK8oiIiKV0GkytkpNYPSj2IXPr3ryz1z00XEGg8JONj4FVSx422W/Z9X2WbGRloV06xe9sbHPecNaMkqqbrR4e3AC7wdstO3fmtDhdhrB/SFkbTPJzX0M22qdrLxm58la6KCOOy8H7STi+AK7zVNX8mNTuG1ag1AycIb2cAYHx8V8xj1OxHG1jejw0YHZWXW1r/b/CrjHJc6ZrnMrKTdsBLgW+I56r6LousaJpV+7Oyva4H4bXdwgvY3Ha5nnlaOoWPJx9Sd9WLUBad2hJO4EZzuSc+9cOdWtY5sHjwrXmtTzjEspcB6uQQRPIwm1lD6+ma/ex4i7Lx4cV7anZbZs9g5YwYB7/FaaKFoa0NFguPNK6V5kdqUUKVC9KooiIihERERSreg+nNo01K1dZWcbUcoLmPdloa4HHCDvuOaqERSuyn1Xydl4nws6ItbmJrq42cAWDOM7cLmu98fia49V8nfOxJA51ZpayJxdXGejY48sB27mkb434N8ZXFIiWXYR6to4ZTZK4PgbTdXlj6IkhxAaXeiBnGTnJ37lpTahpDvKOvbYwinWgaGsEQy57GkNyDtuQ0nPiucREsujp6jp1fymnuQP6KamuIdcRwREvR0UoiIiIiIiIiIiIiIiIoREUIiIiL//Z";
+const LOGO_B64 = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='%23E50914'/><text x='50%25' y='65%25' font-size='50' font-weight='900' font-family='sans-serif' fill='%23FFFFFF' text-anchor='middle'>L2</text></svg>";
 
 const WA_NUMBER  = "5585987880298";
 const WA_DISPLAY = "(85) 98788-0298";
-const POLTRONA_B64 = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAYAAABXAvmHAAAAIGNIUk0AAHomAACAhAAA+gAAAIDoAAB1MAAA6mAAADqYAAAXcJy6UTwAAAAGYktHRAD/AP8A/6C9p5MAAAAHdElNRQfqBREULQP5Qi03AAAMx0lEQVRoge2Ya4wlxXXHf6eqH/d9Z3dmh91hd1kgJECQQSCMDAjHShzHkUWIZYskluIvQXnY/hALx3HkxIqRrCgf8rIVK7EUsEMkW0IytuJYsYKwjTGvkJgQMIaEYdlll92ZuTtzZ+6ju6vq5EP3vXNnHyQ4yzfOTOt2V3VVn/95n4I36U36f5Gcl11U+cZdn+O7114nNz14j2kdf8G0hv3IFLkJUd0tX/nOvLn+sr7n839/Xj43S2cF8Ie33aspd93+NL914aefan2gfSNfy+VD4lqA1CSGV4Gqo1lEaBpqgTUSaotoA6goNo9pANVGRvjPxff2085UouNHV33rmjQVw9zWHyJJavGv9+G1Li7UPHejWrjBbroVqBFgUATVnV51ub6rViAiKjHOb/PHTl173p/tXl8P1X/u3NwbAPT93Ewcfepi1g91fr0nx2csOznVauULQ6asqO5lUEUARPQ2SKKigUr7rRY4Ok/q7RMOzlz+wfN4AmNmH2spLnLhi/0IUio/Eop3YKQRABBVFpWS0ZFZQEURBkJLh2YuSc1FFAVFdsuquSbLheWP+DAAy3MIMtxaN+oPBKyH3Ux1J9aeyUwsqiqqiOhmpwGk5zkRDYETlkvaozxMfv+ONAYABBAfiNSjOlYwqSvVPJc/JQwmiGq1enlKY9QnAhnBw4ckR0jv6xgDQJCEkcV+RDVWlCKFkoDJkoXKHyYOU9woErTivuA0KudMKZwkTDfu/9/6b0tBbO28Aoh0AbEpABwhrquB8CUBRgoIqrA0zGrGlFltKCxH6o4Lce3Y3aiUGEYaFozcYs9RpYK1MzG1va6vXBLI3BICPEoamNm7QW1UU50Ml3YmZyA4tiJQqTGMLApEpxwBaiUVIiSMzVbOge2p5sQu0d74A7DChYq7DHY8/W6iYVRDy4AGwRoiMITbCQjOlnUbERoiNYI3QTCLmanufactGCEbKKzKGdhpjKlMTQJSOISzYat/zDuCiq2/kX3aDICcAnC+jiwJoqYMJg9Xg1GftznAA1buy7SyA1kXDnvMJ4IyE+vWDEUWU/nYUir9uJJbL9nSJjJQOUPEtpy/Vs+10GqmiAlk7fcDsaz+VNO0pmyRH1Mb/lUf1lzbb+1au+sd78y9/5jF+9ZYbXh8AVeX5338b0u3Wo1HvJ3vPrXxgfKJ/J1mQpbRGrILoLJeT+P46qMoJvXHOSpbT6Ka0d9e1NVcfpK30mEniHwYjj3uxjxWm8cONub0nG8MN93fv/j3+5KZ3nBvAn337cQ5+6BfJbbq00Mjv6nTNbZ35pFtvR9YYQTIPg4BsKow8uJKZKRSZgOM1QU1y2vooZ3ltC1VFDESJpdVNmVto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0px/Wf9Zf12bXwPno09ef+DjDz/6N397wa6v1ov8fYNYP4Vxi7Zm0U59ddh3XyAPy2rsKTVmp7CisIG1l0VUGEI0XuvMF3/wqbvDO++8T+/f+z9z1/QfH374fVTrgc9d3sdmnsSGI5D7OvKBnMP+6NHA6feJdl+ODdurD1W9duq9xQ6cdE8Quu3Tu7Yoeuf3z//q69/zdnzlEEBPXssENF++tXbm4KxWHefZ458DDc8VW+ODnHjljzf9ZA6eTLzxFkDwWeTXYSZJnIx8K9+Pu+efffgnKOvl71VXRc+dc82MDcD6wFJ0Y90LzY2ri+72JrMe8WJhoxfwvddSb9Ca9SeeP/gdUGNUGTzQqZAAAAABJRU5ErkJggg==";
+const POLTRONA_B64 = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ea580c' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M19 9V6a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v3'/><path d='M3 11v5a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-5'/><path d='M5 11h14'/><path d='M6 18v2'/><path d='M18 18v2'/></svg>";
 
 // ── Dados ─────────────────────────────────────────────────────────────────────
 const UPHOLSTERY = [
@@ -179,6 +199,11 @@ function ContactModal({ open, onClose }) {
 
 function Logo({ size=40 }) {
   return <img src={LOGO_B64} alt="L2" style={{ width:size, height:size, borderRadius:10, objectFit:"cover", display:"block" }}/>;
+}
+
+// Declarando explicitamente a imagem da poltrona para reutilização
+function PoltronaIcon({ size=24 }) {
+  return <img src={POLTRONA_B64} alt="Poltrona" style={{ width:size, height:size, objectFit:"contain" }}/>;
 }
 
 function LogoWithText({ compact=false }) {
@@ -534,7 +559,7 @@ function ItemCard({ item, index, total, onChange, onRemove }) {
                 ?"border-red-500 bg-red-600/10 text-white"
                 :"border-zinc-700 bg-zinc-900/60 text-zinc-400 hover:border-zinc-500"}`}>
             {u.value === "Poltrona"
-              ? <img src={POLTRONA_B64} alt="Poltrona" style={{width:24,height:24,objectFit:"contain",filter:"brightness(0.9)"}}/>
+              ? <PoltronaIcon size={24}/>
               : <span className="text-xl">{u.icon}</span>
             }
             {u.value}
@@ -688,158 +713,166 @@ function BookingPage({ user, onLogout, onMenuOpen, bookedSlots, onConfirm, draft
         )}
 
         {step===3 && (
-          <div className={cardCls}>
-          <h2 className="text-lg font-bold text-white mb-5">📍 3) Localização e Agendamento</h2>
-            <div className="space-y-4 max-w-lg">
-              <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium text-zinc-400">Endereço completo</label>
-                <input className={inputCls} value={loc.address} onChange={updLoc("address")} placeholder="Rua, número, bloco"/>
+          <div className="space-y-4">
+            <div className={cardCls}>
+              <h2 className="text-lg font-bold text-white mb-5">3) Localização e Horário</h2>
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div className="flex flex-col gap-1 md:col-span-2">
+                    <label className="text-xs font-medium text-zinc-400">Endereço (Rua, Número, Apto)</label>
+                    <input type="text" placeholder="Ex: Av. Paulista, 1000" value={loc.address} onChange={updLoc("address")} className={inputCls}/>
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs font-medium text-zinc-400">Bairro</label>
+                    <input type="text" placeholder="Ex: Centro" value={loc.neighborhood} onChange={updLoc("neighborhood")} className={inputCls}/>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs font-medium text-zinc-400">Cidade</label>
+                    <input type="text" placeholder="Ex: Fortaleza" value={loc.city} onChange={updLoc("city")} className={inputCls}/>
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs font-medium text-zinc-400">Escolha o Dia</label>
+                    <input type="date" value={loc.date} min={new Date().toISOString().split("T")[0]} onChange={e=>{ updLoc("date")(e); setLoc(p=>({...p,time:""})); }} className={inputCls}/>
+                  </div>
+                </div>
+
+                {loc.date && (
+                  <div className="pt-2">
+                    <label className="text-xs font-medium text-zinc-400 block mb-2">
+                      Horários Disponíveis para o dia {loc.date.split("-").reverse().join("/")} {isWeekend?"(Fim de semana)":"(Dia útil)"}
+                    </label>
+                    {availTimes.length===0 ? (
+                      <p className="text-sm text-yellow-500 font-medium">Nenhum horário livre para esta data. Por favor, escolha outro dia.</p>
+                    ) : (
+                      <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+                        {availTimes.map(t=>(
+                          <button key={t} onClick={()=>{ setLoc(p=>({...p,time:t})); setError(""); }}
+                            className={`py-2 rounded-xl border text-center text-xs font-bold transition-colors cursor-pointer
+                              ${loc.time===t
+                                ?"border-red-500 bg-red-600/10 text-white"
+                                :"border-zinc-800 bg-zinc-900/50 text-zinc-400 hover:border-zinc-600"}`}>
+                            {t}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="flex flex-col gap-1">
-                  <label className="text-xs font-medium text-zinc-400">Bairro</label>
-                  <input className={inputCls} value={loc.neighborhood} onChange={updLoc("neighborhood")}/>
-                </div>
-                <div className="flex flex-col gap-1">
-                  <label className="text-xs font-medium text-zinc-400">Cidade</label>
-                  <input className={inputCls} value={loc.city} onChange={updLoc("city")}/>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="flex flex-col gap-1">
-                  <label className="text-xs font-medium text-zinc-400">Data</label>
-                  <input type="date" className={inputCls} value={loc.date}
-                    onChange={e=>{ updLoc("date")(e); setLoc(p=>({...p,time:""})); }}/>
-                </div>
-                <div className="flex flex-col gap-1">
-                  <label className="text-xs font-medium text-zinc-400">Horário</label>
-                  <select className={inputCls} value={loc.time} onChange={updLoc("time")}>
-                    <option value="">Escolha um horário</option>
-                    {loc.date && availTimes.length===0 && <option disabled>Sem horários disponíveis</option>}
-                    {availTimes.map(t=><option key={t} value={t}>{t}</option>)}
-                  </select>
-                </div>
-              </div>
-              {isWeekend && <p className="text-xs text-zinc-500 m-0">🗓️ Sábados e domingos: atendimentos na parte da manhã.</p>}
+              <ErrorMsg msg={error}/>
             </div>
-            <ErrorMsg msg={error}/>
-            <div className="flex gap-3 mt-6">
+            <div className="flex gap-3 mt-5">
               <button onClick={()=>{ setStep(2); setError(""); }} className={`${btnGhost} px-5 py-2.5`}>← Voltar</button>
-              <button onClick={submit} className={`${btnRed} px-6 py-2.5`}>Confirmar Agendamento</button>
+              <button onClick={submit} className={`${btnRed} px-6 py-2.5`}>Confirmar Agendamento 🚀</button>
             </div>
           </div>
         )}
-
-        <Footer/>
       </div>
+      <Footer/>
     </div>
   );
 }
 
 // ── ConfirmationPage ──────────────────────────────────────────────────────────
 function ConfirmationPage({ booking, user, onLogout, onMenuOpen, onRestart, onEdit, onCancel }) {
-  const [contactOpen,      setContactOpen]      = useState(false);
-  const [showCancelConfirm,setShowCancelConfirm] = useState(false);
-  if (!booking) return null;
+  const [copied, setCopied] = useState(false);
 
-  const isCanceled  = booking.status === "cancelado";
-  const isAltered   = booking.status === "alterado";
-  const isConcluded = booking.status === "concluido";
-  const itemsList = booking.items || [];
-  const itemsStr  = itemsList.map(it=>`${it.upholstery_type} (${it.tipo})`).join(", ");
-  const waMsg     = encodeURIComponent(`Olá, gostaria de fazer um orçamento para lavagem de ${itemsStr} na L2 Lavagem a Seco.`);
+  function copyText() {
+    if (!booking) return;
+    const txt = `📋 *NOVO AGENDAMENTO DE LAVAGEM - L2*\n\n` +
+                `👤 *Cliente:* ${booking.client_name}\n` +
+                `📞 *Telefone:* ${booking.client_phone}\n` +
+                `✉️ *Email:* ${booking.client_email}\n\n` +
+                `📌 *Serviços Selecionados:*\n` +
+                booking.items.map((it,i)=>`  ${i+1}. ${it.upholstery_type} (${it.tipo})`).join("\n") + `\n\n` +
+                `🚚 *Atendimento:* ${booking.service_type}\n` +
+                `📍 *Local:* ${booking.address}, ${booking.neighborhood} - ${booking.city}\n` +
+                `📅 *Data:* ${booking.date.split("-").reverse().join("/")}\n` +
+                `⏰ *Horário:* ${booking.time}\n\n` +
+                `⚙️ *Status:* ${booking.status.toUpperCase()}`;
+
+    const el = document.createElement("textarea");
+    el.value = txt;
+    el.setAttribute("readonly", "");
+    el.style.cssText = "position:fixed;top:-9999px;left:-9999px;opacity:0";
+    document.body.appendChild(el);
+    el.select();
+    try { document.execCommand("copy"); } catch(e) {}
+    document.body.removeChild(el);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2500);
+  }
+
+  if (!booking) {
+    return (
+      <div className="min-h-screen px-4 py-6 flex flex-col justify-between">
+        <div className="max-w-2xl mx-auto w-full text-center py-20">
+          <p className="text-zinc-400">Nenhum agendamento ativo localizado.</p>
+          <button onClick={onRestart} className={`${btnRed} px-6 py-2.5 mt-4`}>Voltar ao Início</button>
+        </div>
+      </div>
+    );
+  }
+
+  const dtFormato = booking.date.split("-").reverse().join("/");
 
   return (
     <div className="min-h-screen px-4 py-6 flex flex-col justify-between">
-      <ContactModal open={contactOpen} onClose={()=>setContactOpen(false)}/>
       <div className="max-w-2xl mx-auto w-full text-left">
         <Header user={user} onLogout={onLogout} onMenuOpen={onMenuOpen}/>
-        <div className={cardCls}>
-          <h2 className="text-xl sm:text-2xl font-extrabold text-white mb-4">
-            {isCanceled?"🚫 Agendamento Cancelado":isAltered?"⚠️ Agendamento Alterado":isConcluded?"✔ Serviço Concluído":"✅ Agendamento Confirmado"}
-          </h2>
+        <div className="text-center my-6">
+    <span className="text-4xl">🎉</span>
+          <h1 className="text-3xl font-extrabold text-white mt-3">Agendamento Realizado!</h1>
+          <p className="text-zinc-400 text-sm mt-1">Seus dados foram salvos com sucesso e o horário está reservado.</p>
+        </div>
 
-          {isCanceled && (
-            <div className="bg-red-900/25 border border-red-500/40 rounded-xl px-4 py-3 text-red-300 text-sm font-semibold mb-5">
-              Este agendamento foi cancelado pela empresa. Entre em contato para mais informações.
-            </div>
-          )}
-          {isAltered && (
-            <div className="bg-yellow-900/25 border border-yellow-500/40 rounded-xl px-4 py-3 text-yellow-300 text-sm font-semibold mb-5">
-              ⚠️ A empresa alterou seu agendamento. Confira os novos dados abaixo.
-            </div>
-          )}
-          {!isCanceled && !isAltered && !isConcluded && (
-            <div className="bg-green-900/20 border border-green-500/30 rounded-xl px-4 py-3 text-green-300 text-sm font-semibold mb-5">
-              Seu serviço foi agendado com sucesso!
-            </div>
-          )}
-          {isConcluded && (
-            <div className="bg-green-900/25 border border-green-500/40 rounded-xl px-4 py-3 text-green-300 text-sm font-semibold mb-5">
-              ✔ Serviço concluído. Obrigado por escolher a L2 Lavagem a Seco!
-            </div>
-          )}
+        <div className={cardCls + " space-y-4"}>
+          <div className="flex justify-between items-center border-b border-zinc-800 pb-3">
+            <span className="text-xs font-bold uppercase tracking-wider text-zinc-500">Resumo da Solicitação</span>
+            <span className={`text-xs font-black px-3 py-1 rounded-full ${booking.status==="confirmado"?"bg-green-600/20 text-green-400 border border-green-500/30":"bg-yellow-600/20 text-yellow-400 border border-yellow-500/30"}`}>
+              ● {booking.status.toUpperCase()}
+            </span>
+          </div>
 
-          <div className="bg-zinc-800/60 border border-zinc-700 rounded-xl p-5 space-y-4 text-sm mb-6">
-            <div>
-              <p className="text-white font-semibold mb-2">Estofados ({itemsList.length}):</p>
-              <div className="space-y-1 pl-2">
-                {itemsList.map((it,i)=>(
-                  <p key={i} className="text-zinc-300 m-0">
-                    <span className="text-zinc-500 mr-1">{i+1}.</span>
-                    <strong className="text-white">{it.upholstery_type}</strong> — {it.tipo}
-                  </p>
-                ))}
-              </div>
-            </div>
-            <div className="border-t border-zinc-700 pt-3 space-y-2">
-              {[
-                ["Tipo de atendimento", booking.service_type],
-                ["Endereço",           `${booking.address}, ${booking.neighborhood}, ${booking.city}`],
-                ["Data e horário",     `${booking.date} às ${booking.time}`],
-              ].map(([label,value])=>(
-                <p key={label} className="text-zinc-300 m-0"><strong className="text-white">{label}:</strong> {value}</p>
+          <div className="text-sm space-y-2 text-zinc-300">
+            <p>👤 <strong className="text-white">Cliente:</strong> {booking.client_name} ({booking.client_phone})</p>
+            <p>🏠 <strong className="text-white">Modalidade:</strong> {booking.service_type}</p>
+            <p>📍 <strong className="text-white">Endereço:</strong> {booking.address}, {booking.neighborhood} — {booking.city}</p>
+            <p>📅 <strong className="text-white">Data/Horário:</strong> {dtFormato} às {booking.time}</p>
+          </div>
+
+          <div className="border-t border-zinc-800 pt-3">
+            <p className="text-xs font-bold text-zinc-400 mb-2">Itens Solicitados:</p>
+            <div className="space-y-1">
+              {booking.items.map((it,i)=>(
+                <div key={i} className="bg-zinc-800/40 rounded-lg px-3 py-2 text-xs flex justify-between text-zinc-300">
+                  <span>{i+1}. {it.upholstery_type}</span>
+                  <span className="text-zinc-400 font-medium">{it.tipo}</span>
+                </div>
               ))}
             </div>
           </div>
-
-          <div className="flex flex-wrap gap-3 mb-4">
-            <a href={`https://wa.me/${WA_NUMBER}?text=${waMsg}`} target="_blank" rel="noreferrer"
-              className="bg-green-700 hover:bg-green-600 text-white font-bold px-5 py-3 rounded-xl text-sm transition-colors text-center justify-center inline-block">
-              💬 Orçamento pelo WhatsApp
-            </a>
-            <button onClick={()=>setContactOpen(true)}
-              className="bg-zinc-700 hover:bg-zinc-600 text-white font-bold px-5 py-3 rounded-xl text-sm transition-colors cursor-pointer">
-              📞 Orçamento pelo Telefone
-            </button>
-            <button onClick={onRestart} className={`${btnGhost} px-5 py-3`}>Voltar ao Início</button>
-          </div>
-
-          {!isCanceled && !isConcluded && (
-            <div className="flex flex-wrap gap-3 pt-4 border-t border-zinc-800">
-              <button onClick={onEdit}
-                className="bg-zinc-800 border border-zinc-700 hover:bg-zinc-700 text-zinc-300 font-semibold px-5 py-2.5 rounded-xl text-sm transition-colors cursor-pointer">
-                ✏️ Editar Agendamento
-              </button>
-              <button onClick={()=>setShowCancelConfirm(true)}
-                className="bg-red-900/30 border border-red-700/50 hover:bg-red-900/60 text-red-400 font-semibold px-5 py-2.5 rounded-xl text-sm transition-colors cursor-pointer">
-                🗑️ Cancelar Agendamento
-              </button>
-            </div>
-          )}
-
-          {showCancelConfirm && (
-            <div className="mt-4 bg-zinc-800 border border-zinc-700 rounded-xl p-4">
-              <p className="text-white text-sm font-semibold mb-3">Tem certeza que deseja cancelar?</p>
-              <div className="flex gap-3">
-                <button onClick={onCancel} className={`${btnRed} px-4 py-2`}>Sim, cancelar</button>
-                <button onClick={()=>setShowCancelConfirm(false)} className={`${btnGhost} px-4 py-2`}>Não, manter</button>
-              </div>
-            </div>
-          )}
         </div>
-        <Footer/>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-5">
+          <button onClick={copyText} className={`${btnGhost} py-3 font-bold`}>
+            {copied ? "✅ Texto Copiado!" : "📋 Copiar Dados para Enviar"}
+          </button>
+          <a href={`https://wa.me/${WA_NUMBER}`} target="_blank" rel="noreferrer"
+            className="bg-green-600 hover:bg-green-500 text-white font-bold rounded-xl text-sm transition-colors cursor-pointer flex items-center justify-center gap-2 py-3">
+            💬 Abrir WhatsApp Comercial
+          </a>
+        </div>
+
+        <div className="flex items-center justify-center gap-6 mt-8 border-t border-zinc-800 pt-6">
+          <button onClick={onEdit} className="text-xs text-zinc-400 hover:text-white transition-colors cursor-pointer">✏️ Alterar horário/local</button>
+          <button onClick={onCancel} className="text-xs text-red-400 hover:text-red-300 transition-colors cursor-pointer">✕ Cancelar Agendamento</button>
+        </div>
       </div>
+      <Footer/>
     </div>
   );
 }
@@ -848,18 +881,16 @@ function ConfirmationPage({ booking, user, onLogout, onMenuOpen, onRestart, onEd
 function NoBookingPage({ user, onLogout, onMenuOpen, onBack }) {
   return (
     <div className="min-h-screen px-4 py-6 flex flex-col justify-between">
-      <div className="max-w-5xl mx-auto w-full">
+      <div className="max-w-2xl mx-auto w-full text-left">
         <Header user={user} onLogout={onLogout} onMenuOpen={onMenuOpen}/>
-        <div className="max-w-md mx-auto mt-16 text-center">
-          <div className={cardCls}>
-            <p className="text-3xl mb-4 m-0">📋</p>
-            <p className="text-white font-bold text-lg mb-2 m-0">Nenhum agendamento feito</p>
-            <p className="text-zinc-400 text-sm mb-6 m-0">Você ainda não possui agendamentos ativos.</p>
-            <button onClick={onBack} className={`${btnRed} px-6 py-3`}>← Voltar</button>
-          </div>
+        <div className="text-center py-20 bg-zinc-900/50 border border-zinc-800 rounded-3xl p-8 max-w-md mx-auto mt-10">
+          <span className="text-4xl">📋</span>
+          <h2 className="text-xl font-bold text-white mt-4">Nenhum agendamento ativo</h2>
+          <p className="text-zinc-400 text-sm mt-2 mb-6">Você não possui nenhuma lavagem pendente ou agendada para o futuro no momento.</p>
+          <button onClick={onBack} className={`${btnRed} px-6 py-2.5 w-full`}>Voltar ao início</button>
         </div>
-        <Footer/>
       </div>
+      <Footer/>
     </div>
   );
-                  }
+}
