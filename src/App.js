@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect } from "react";
 
-// Injeta dinamicamente o Tailwind CSS e as Fontes para garantir o visual idêntico
+// Injeta dinamicamente o Tailwind CSS e as Fontes para garantir o visual idêntico aos prints
 if (typeof window !== "undefined" && !document.getElementById("tailwind-cdn")) {
   const linkFont = document.createElement("link");
   linkFont.rel = "stylesheet";
@@ -17,13 +17,17 @@ if (typeof window !== "undefined" && !document.getElementById("tailwind-cdn")) {
   document.head.appendChild(styleInline);
 }
 
-// ── SISTEMA DE ARMAZENAMENTO CORRIGIDO (Contas e Agendamentos) ──
+// ── Chaves de storage compartilhada e vinculada à conta ─────────────────────
 const STORAGE_KEY = "l2_bookings";
 const NOTIF_KEY   = "l2_notifications";
 const USERS_KEY   = "l2_registered_users";
 
 async function loadAllBookings() {
   try {
+    if (window.storage && window.storage.get) {
+      const r = await window.storage.get(STORAGE_KEY, true);
+      return r ? JSON.parse(r.value) : [];
+    }
     const local = localStorage.getItem(STORAGE_KEY);
     return local ? JSON.parse(local) : [];
   } catch { return []; }
@@ -31,24 +35,42 @@ async function loadAllBookings() {
 
 async function saveAllBookings(list) {
   try { 
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+    if (window.storage && window.storage.set) {
+      await window.storage.set(STORAGE_KEY, JSON.stringify(list), true); 
+    } else {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+    }
   } catch {}
 }
 
 async function getMyNotifications(bookingId) {
   try {
-    const local = localStorage.getItem(NOTIF_KEY);
-    const all = local ? JSON.parse(local) : [];
+    let all = [];
+    if (window.storage && window.storage.get) {
+      const r = await window.storage.get(NOTIF_KEY, true);
+      all = r ? JSON.parse(r.value) : [];
+    } else {
+      const local = localStorage.getItem(NOTIF_KEY);
+      all = local ? JSON.parse(local) : [];
+    }
     return all.filter(n => n.bookingId === bookingId && !n.seen);
   } catch { return []; }
 }
 
 async function markNotifsSeen(bookingId) {
   try {
-    const local = localStorage.getItem(NOTIF_KEY);
-    let all = local ? JSON.parse(local) : [];
-    all = all.map(n => n.bookingId === bookingId ? { ...n, seen: true } : n);
-    localStorage.setItem(NOTIF_KEY, JSON.stringify(all));
+    let all = [];
+    if (window.storage && window.storage.get) {
+      const r = await window.storage.get(NOTIF_KEY, true);
+      all = r ? JSON.parse(r.value) : [];
+      all = all.map(n => n.bookingId === bookingId ? { ...n, seen: true } : n);
+      await window.storage.set(NOTIF_KEY, JSON.stringify(all), true);
+    } else {
+      const local = localStorage.getItem(NOTIF_KEY);
+      all = local ? JSON.parse(local) : [];
+      all = all.map(n => n.bookingId === bookingId ? { ...n, seen: true } : n);
+      localStorage.setItem(NOTIF_KEY, JSON.stringify(all));
+    }
   } catch {}
 }
 
@@ -59,18 +81,23 @@ function getUsersFromStorage() {
   } catch { return []; }
 }
 
-// Imagem da Logo da Empresa via link direto
-const LOGO_B64 = "https://i.imgur.com/uG9XN98.png";
+const LOGO_B64 = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAAAAAAD/2wBDAA0JCgsKCA0LCgsODg0PEyAVExISEyccHhcgLikxMC4pLSwzOko+MzZGNywtQFdBRkxOUlNSMj5aYVpQYEpRUk//2wBDAQ4ODhMREyYVFSZPNS01T09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT0//wAARCAB4AHgDASIAAhEBAxEB/8QAGwABAAIDAQEAAAAAAAAAAAAAAAEFAgQGAwf/xAA7EAABBAECAgU集中/8QAGgEBAAMBAQEAAAAAAAAAAAAAAAEDBAUCBv/EADMRAAEDAgMFBQYHAAAAAAAAAAEAAgMEERIhMQUTUWHwFDJBcYFSU6Gx0eEVIiM0VMHx/9oAMBAAIRAxEAPwD5giIiKURetWHziwyLOOI7nwUE2FyvbGF7g0aleSLonup0Yw1zWgHkMZJXl1lR9h34Aqcomput2ZHOOgPU3YcZ4mn2cfwobcsVnhl6McJOBI3krBYTRNmidG8Za4YWMSA5OGS+kdSPYMUTzi5m4Pn9l6wBr5Yxza4j4hXPldRq6drZr04uji6JruHJO5z3rmdCkcfsX84ZA34ZXXeXn+ZD/0M/VSWYWuHkqo6kyzROGQIdcc8vktLQ6enzMs29UscMFduehY4B8p7h4fut2xQ0rUNBs6lpcM1V9RwEkUj+IOB9ef/AHJUFeCW1YZBAwvkkPC1o9ZXQ63LBoujjyfqvElmUiS5IOQ9YaPkPh70ZYtNxklVjbM3A84iRl4AeN1xOo2TUtQyhvFljgRnGeS13azIR2IWg95OVOu+lD7j+iqlpiiY5gJC49fWzw1D2RusPsF62LEth/HK7J5DuC8FksVoAAyC4r3OecTjclERFK8oiIiKV0GkytkpNYPSj2IXPr3ryz1z00XEGg8JONj4FVSx422W/Z9X2WbGRloV06xe9sbHPecNaMkqqbrR4e3AC7wdstO3fmtDhdhrB/SFkbTPJzX0M22qdrLxm58la6KCOOy8H7STi+AK7zVNX8mNTuG1ag1AycIb2cAYHx8V8xj1OxHG1jejw0YHZWXW1r/b/CrjHJc6ZrnMrKTdsBLgW+I56r6LousaJpV+7Oyva4H4bXdwgvY3Ha5nnlaOoWPJx9Sd9WLUBad2hJO4EZzuSc+9cOdWtY5sHjwrXmtTzjEspcB6uQQRPIwm1lD6+ma/ex4i7Lx4cV7anZbZs9g5YwYB7/FaaKFoa0NFguPNK6V5kdqUUKVC9KooiIihERERSreg+nNo01K1dZWcbUcoLmPdloa4HHCDvuOaqERSuyn1Xydl4nws6ItbmJrq42cAWDOM7cLmu98fia49V8nfOxJA51ZpayJxdXGejY48sB27mkb434N8ZXFIiWXYR6to4ZTZK4PgbTdXlj6IkhxAaXeiBnGTnJ37lpTahpDvKOvbYwinWgaGsEQy57GkNyDtuQ0nPiucREsujp6jp1fymnuQP6KamuIdcRwREvR0UoiIiIiIiIiIiIiIiIoREUIiIiL//Z";
 
-// Imagem da Poltrona enviada por você em Base64
-const CHAIR_B64 = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAFAAAABQCAYAAACOEfKtAAAACXBIWXMAAAsTAAALEwEAmpwYAAAC8ElEQVR4nO2by3HDMAxEXSuuOqkqqSqpKqk68ZInSgYfC7wY7gAs7vAByS9YgCBIgB8mOfmZ6A78WPeAmYFvBh6AZ+AF+ALe6N6f3IHP6gHzwBvwy8Ar8A78Zp9z6IfeM/AOfGf91f3Wp/GZ6Xz6m9KdfTtwC6vAb8BfA68A78AdYArX69Ofz9uXgAfgY66Z/Wb/N/U+63bqE7gBfO0gTGBEAnf6C0bEwAjzbyECo0/g6OitpU/g9YF86fS6wOunbZ/vXpS6b6UOfS9m4Agf+G6ZgSPswI078H8MvALfE+v9O/At8Qv3vC986GvC8A/wK/FzO+978pOfE/mFez6XOPyT+CUPfEq87uXwTw6PMPwTeCgOfwSOfyvA/4P7fofHCHt+9Hj/Xy3wR3F6jPDhL8Tpf2D5S8R7YgOWeG+swBofjhVY49vE8E8y/KMMj3D4pxkeEw6P3g6PlmX4pzo9WhXgS0b4W90erS7wkRH+mE6PVhf4xAh/rNOjdQU+M8If9/S6wFdG+GfV6XWB74zwv6zT6wI/GeGfT6dfFfjFCP9mOn21wF9G+LfV6asFvjPCH7unrxZ4ZIR/ek7fGnjy7+f/rG+V6U39W986gT8tM7ArwBv3O+G2fBq/WeD107bPd7v7VurQ9+L0D7ADWb86Ueq+lTr0vdSAnRHOvXWpY98rNWDnw9q3fNqw82EdfB/mF7DqE6P9b+p91u3U+wWsv/D/5v4pP6fC24wzH3ZGBOAs8ALf989Yp78p3dlv/S0u/R7YgRvmW/Zg9uB1RjiXzS8m57u9wZ/uQOebp88p8C8vUOnM8P/bC/yAOfg2/F6X/gC2oH68An9gXpG/vB+fA8zBt+EHf70f699M/T8eWbW8W96g7gAAAABJRU5ErkJggg==";
+const WA_NUMBER  = "5585987880298";
+const WA_DISPLAY = "(85) 98788-0298";
+const POLTRONA_B64 = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAYAAABXAvmHAAAAIGNIUk0AAHomAACAhAAA+gAAAIDoAAB1MAAA6mAAADqYAAAXcJy6UTwAAAAGYktHRAD/AP8A/6C9p5MAAAAHdElNRQfqBREULQP5Qi03AAAMx0lEQVRoge2Ya4wlxXXHf6eqH/d9Z3dmh91hd1kgJECQQSCMDAjHShzHkUWIZYskluIvQXnY/hALx3HkxIqRrCgf8rIVK7EUsEMkW0IytuJYsYKwjTGvkJgQMIaEYdlll92ZuTtzZ+6ju6vq5EP3vXNnHyQ4yzfOTOt2V3VVn/95n4I36U36f5Gcl11U+cZdn+O7114nNz14j2kdf8G0hv3IFLkJUd0tX/nOvLn+sr7n839/Xj43S2cF8Ie33aspd93+NL914aefan2gfSNfy+VD4lqA1CSGV4Gqo1lEaBpqgTUSaotoA6goNo9pANVGRvjPxff2085UouNHV33rmjQVw9zWHyJJavGv9+G1Li7UPHejWrjBbroVqBFgUATVnV51ub6rViAiKjHOb/PHTl173p/tXl8P1X/u3NwbAPT93Ewcfepi1g91fr0nx2csOznVauULQ6asqO5lUEUARPQ2SKKigUr7rRY4Ok/q7RMOzlz+wfN4AmNmH2spLnLhi/0IUio/Eop3YKQRABBVFpWS0ZFZQEURBkJLh2YuSc1FFAVFdsuquSbLheWP+DAAy3MIMtxaN+oPBKyH3Ux1J9aeyUwsqiqqiOhmpwGk5zkRDYETlkvaozxMfv+ONAYABBAfiNSjOlYwqSvVPJc/JQwmiGq1enlKY9QnAhnBw4ckR0jv6xgDQJCEkcV+RDVWlCKFkoDJkoXKHyYOU9woErTivuA0KudMKZwkTDfu/9/6b0tBbO28Aoh0AbEpABwhrquB8CUBRgoIqrA0zGrGlFltKCxH6o4Lce3Y3aiUGEYaFozcYs9RpYK1MzG1va6vXBLI3BICPEoamNm7QW1UU50Ml3YmZyA4tiJQqTGMLApEpxwBaiUVIiSMzVbOge2p5sQu0d74A7DChYq7DHY8/W6iYVRDy4AGwRoiMITbCQjOlnUbERoiNYI3QTCLmanufactGCEbKKzKGdhpjKlMTQJSOISzYat/zDuCiq2/kX3aDICcAnC+jiwJoqYMJg9Xg1GftznAA1buy7SyA1kXDnvMJ4IyE+vWDEUWU/nYUir9uJJbL9nSJjJQOUPEtpy/Vs+10GqmiAlk7fcDsaz+VNO0pmyRH1Mb/lUf1lzbb+1au+sd78y9/5jF+9ZYbXh8AVeX5338b0u3Wo1HvJ3vPrXxgfKJ/J1mQpbRGrILoLJeT+P46qMoJvXHOSpbT6Ka0d9e1NVcfpK30mEniHwYjj3uxjxWm8cONub0nG8MN93fv/j3+5KZ3nBvAn337cQ5+6BfJbbq00Mjv6nTNbZ35pFtvR9YYQTIPg4BsKow8uJKZKRSZgOM1QU1y2vooZ3ltC1VFDESJpdVNmVto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0pinto0px/Wf9Zf12bXwPno09ef+DjDz/6N397wa6v1ov8fYNYP4Vxi7Zm0U59ddh3XyAPy2rsKTVmp7CisIG1l0VUGEI0XuvMF3/wqbvDO++8T+/f+z9z1/QfH374fVTrgc9d3sdmnsSGI5D7OvKBnMP+6NHA6feJdl+ODdurD1W9duq9xQ6cdE8Quu3Tu7Yoeuf3z//q69/zdnzlEEBPXssENF++tXbm4KxWHefZ458DDc8VW+ODnHjljzf9ZA6eTLzxFkDwWeTXYSZJnIx8K9+Pu+efffgnKOvl71VXRc+dc82MDcD6wFJ0Y90LzY2ri+72JrMe8WJhoxfwvddSb9Ca9SeeP/gdUGNUGTzQqZAAAAABJRU5ErkJggg==";
 
+// ── Dados ─────────────────────────────────────────────────────────────────────
 const UPHOLSTERY = [
-  { value: "Sofá",     icon: "🛋️", desc: "Higienização profunda para sofás", tipos: ["Comum (2 lugares)","Comum (3 lugares)","Retrátil (2 lugares)","Retrátil (3 lugares)","Sofá-Cama","Outro"] },
+  { value: "Sofá",     icon: "🛋️", desc: "Higienização profunda para sofás",
+    tipos: ["Comum (2 lugares)","Comum (3 lugares)","Retrátil (2 lugares)","Retrátil (3 lugares)","Sofá-Cama","Outro"] },
   { value: "Tapete",   icon: "🧶",  desc: "Remoção de sujeira e odores", tipos: ["m²"] },
-  { value: "Cama",     icon: "🛏️", desc: "Limpeza e sanitização de colchões", tipos: ["Colchão Solteiro","Colchão Solteiro King","Colchão Padrão","Colchão Casal Padrão","Colchão Casal Queen","Colchão Casal King","Outro"] },
-  { value: "Cadeiras", icon: "🪑",  desc: "Ideal para tecido e couro", tipos: ["Cadeira de Escritório","Cadeira de Jantar","Outro"] },
-  { value: "Poltrona", icon: <img src={CHAIR_B64} alt="Poltrona" className="w-10 h-10 object-contain mx-auto invert" />, desc: "Limpeza profunda e higienização de poltronas", tipos: ["Simples","Reclinável","Outro"] },
+  { value: "Cama",     icon: "🛏️", desc: "Limpeza e sanitização de colchões",
+    tipos: ["Colchão Solteiro","Colchão Solteiro King","Colchão Padrão","Colchão Casal Padrão","Colchão Casal Queen","Colchão Casal King","Outro"] },
+  { value: "Cadeiras", icon: "🪑",  desc: "Ideal para tecido e couro",
+    tipos: ["Cadeira de Escritório","Cadeira de Jantar","Outro"] },
+  { value: "Poltrona", icon: null,  desc: "Limpeza profunda e higienização de poltronas",
+    tipos: ["Simples","Reclinável","Outro"] },
 ];
 
 const SERVICES = [
@@ -91,12 +118,14 @@ function getAvailableTimes(dateStr, booked = []) {
 function isValidPhone(ph) { return /^\d{10,11}$/.test(ph.replace(/\D/g,"")); }
 function isValidEmail(em) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em); }
 
+// ── Estilos constantes ────────────────────────────────────────────────────────
 const pageBg  = { background: "radial-gradient(ellipse 70% 50% at 10% 0%, rgba(200,20,20,0.18), transparent 55%), #09090b" };
 const inputCls = "bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-red-500 transition-colors w-full";
 const cardCls  = "bg-zinc-900/70 border border-zinc-800 rounded-2xl p-6";
 const btnRed   = "bg-red-600 hover:bg-red-500 text-white font-bold rounded-xl text-sm transition-colors cursor-pointer";
 const btnGhost = "bg-zinc-800 border border-zinc-700 hover:bg-zinc-700 text-zinc-200 font-semibold rounded-xl text-sm transition-colors cursor-pointer";
 
+// ── Componentes base ──────────────────────────────────────────────────────────
 function ErrorMsg({ msg }) {
   if (!msg) return null;
   return (
@@ -105,11 +134,20 @@ function ErrorMsg({ msg }) {
     </div>
   );
 }
+
 function ContactModal({ open, onClose }) {
   const [copied, setCopied] = useState(false);
   if (!open) return null;
   function copy() {
-    navigator.clipboard.writeText("(85) 98788-0298");
+    const el = document.createElement("textarea");
+    el.value = WA_DISPLAY;
+    el.setAttribute("readonly", "");
+    el.style.cssText = "position:fixed;top:-9999px;left:-9999px;opacity:0";
+    document.body.appendChild(el);
+    el.select();
+    el.setSelectionRange(0, 99999);
+    try { document.execCommand("copy"); } catch(e) {}
+    document.body.removeChild(el);
     setCopied(true);
     setTimeout(() => setCopied(false), 2500);
   }
@@ -120,9 +158,13 @@ function ContactModal({ open, onClose }) {
         <h3 className="text-white font-bold text-lg mb-1">Falar Conosco</h3>
         <p className="text-zinc-400 text-sm mb-4">Escolha como entrar em contato:</p>
         <div className="flex flex-col gap-3">
-          <a href="https://wa.me/5585987880298" target="_blank" rel="noreferrer"
+          <a href={`https://wa.me/${WA_NUMBER}`} target="_blank" rel="noreferrer"
             className="flex items-center gap-3 bg-green-700 hover:bg-green-600 text-white font-semibold px-4 py-3 rounded-xl text-sm transition-colors text-center justify-center">
-            💬 WhatsApp — (85) 98788-0298
+            💬 WhatsApp — {WA_DISPLAY}
+          </a>
+          <a href={`tel:+${WA_NUMBER}`}
+            className="flex items-center gap-3 bg-blue-700 hover:bg-blue-600 text-white font-semibold px-4 py-3 rounded-xl text-sm transition-colors text-center justify-center">
+            📞 Ligar — {WA_DISPLAY}
           </a>
           <button onClick={copy}
             className="flex items-center gap-3 bg-zinc-700 hover:bg-zinc-600 text-white font-semibold px-4 py-3 rounded-xl text-sm transition-colors cursor-pointer justify-center">
@@ -135,10 +177,14 @@ function ContactModal({ open, onClose }) {
   );
 }
 
+function Logo({ size=40 }) {
+  return <img src={LOGO_B64} alt="L2" style={{ width:size, height:size, borderRadius:10, objectFit:"cover", display:"block" }}/>;
+}
+
 function LogoWithText({ compact=false }) {
   return (
     <div className="flex items-center gap-3 text-left">
-      <img src={LOGO_B64} alt="L2 Logo" className={`${compact ? 'w-10 h-10' : 'w-14 h-14'} object-contain rounded-xl`} />
+      <Logo size={compact?36:52}/>
       <div>
         <p className="text-xs uppercase tracking-widest text-zinc-500 m-0">L2</p>
         <p className="text-sm font-bold text-white leading-tight m-0">Lavagem a Seco</p>
@@ -159,6 +205,7 @@ function StepChips({ current }) {
   );
 }
 
+// ── Sidebar ───────────────────────────────────────────────────────────────────
 function Sidebar({ open, onClose, user, onGoToAuth, onGoToBookingCheck }) {
   const [contactOpen, setContactOpen] = useState(false);
   const initial = user?.full_name?.[0]?.toUpperCase() || "?";
@@ -184,7 +231,7 @@ function Sidebar({ open, onClose, user, onGoToAuth, onGoToBookingCheck }) {
         <button onClick={()=>{ onGoToBookingCheck(); onClose(); }}
           className="flex items-center gap-3 p-4 border-b border-zinc-800 hover:bg-zinc-800/50 transition-colors text-left w-full cursor-pointer">
           <span className="text-xl">📋</span>
-          <p className="text-sm font-semibold text-white m-0">Conferir agendamento</p>
+          <p className="text-sm font-semibold text-white m-0">Conferir agendamento de lavagem</p>
         </button>
         <button onClick={()=>setContactOpen(true)}
           className="flex items-center gap-3 p-4 border-b border-zinc-800 hover:bg-zinc-800/50 transition-colors text-left w-full cursor-pointer">
@@ -218,11 +265,12 @@ function Footer() {
   return (
     <footer className="flex items-center justify-between bg-zinc-900/60 border border-zinc-800 rounded-2xl px-5 py-4 mt-8 flex-wrap gap-3 text-left">
       <LogoWithText compact/>
-      <p className="text-zinc-600 text-xs m-0">© {new Date().getFullYear()} L2 - Lavagem a Seco.</p>
+      <p className="text-zinc-600 text-xs m-0">© {new Date().getFullYear()} L2 - Lavagem a Seco. Atendimento profissional e pontual.</p>
     </footer>
   );
 }
 
+// ── Root ──────────────────────────────────────────────────────────────────────
 export default function App() {
   const [user,         setUser]         = useState(null);
   const [bookedSlots,  setBookedSlots]  = useState([]);
@@ -231,6 +279,25 @@ export default function App() {
   const [sidebarOpen,  setSidebarOpen]  = useState(false);
   const [draft,        setDraft]        = useState(null);
   const [adminNotif,   setAdminNotif]   = useState(null);
+
+  // Sincroniza agendamentos permanentemente vinculados à conta do usuário logado
+  useEffect(() => {
+    async function init() {
+      const all = await loadAllBookings();
+      const slots = all.filter(b => b.status !== "cancelado").map(b => `${b.date}_${b.time}`);
+      setBookedSlots(slots);
+      if (user) {
+        const mine = all.filter(b => b.client_email === user.email);
+        if (mine.length > 0) {
+          const sorted = mine.sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
+          setActiveBooking(sorted[0]);
+        } else {
+          setActiveBooking(null);
+        }
+      }
+    }
+    init();
+  }, [user]);
 
   const handleLogout      = useCallback(()=>{ setUser(null); setPage("auth"); },[]);
   const handleAuthSuccess = useCallback(u=>{ setUser(u); setPage("home"); },[]);
@@ -265,7 +332,7 @@ export default function App() {
       const all = await loadAllBookings();
       const newBooking = {
         ...booking,
-        id: `bk_${Date.now()}`,
+        id: `bk_${Date.now()}_${Math.random().toString(36).slice(2,7)}`,
         client_name:  user?.full_name||"Cliente",
         client_email: user?.email||"",
         client_phone: user?.phone||"",
@@ -282,11 +349,29 @@ export default function App() {
     setPage("confirmation");
   },[user]);
 
+  const handleEdit = useCallback(()=>{
+    setDraft(activeBooking);
+    setPage("booking");
+  },[activeBooking]);
+
+  const handleCancel = useCallback(async ()=>{
+    if (activeBooking) {
+      const slot = `${activeBooking.date}_${activeBooking.time}`;
+      setBookedSlots(p=>p.filter(s=>s!==slot));
+      try {
+        const all = await loadAllBookings();
+        await saveAllBookings(all.map(b=>b.id===activeBooking.id?{...b,status:"cancelado"}:b));
+      } catch {}
+      setActiveBooking(null);
+    }
+    setPage("home");
+  },[activeBooking]);
+
   return (
     <div style={pageBg} className="min-h-screen text-zinc-100 flex flex-col justify-between">
       <div>
         {adminNotif && (
-          <div className="fixed top-5 left-1/2 -translate-x-1/2 z-50 bg-yellow-600 text-white px-5 py-3 rounded-xl shadow-2xl text-sm font-semibold text-center"
+          <div className="fixed top-5 left-1/2 -translate-x-1/2 z-50 bg-yellow-600 text-white px-5 py-3 rounded-xl shadow-2xl text-sm font-semibold cursor-pointer max-w-xs text-center"
             onClick={()=>setAdminNotif(null)}>
             🔔 {adminNotif}
           </div>
@@ -297,13 +382,15 @@ export default function App() {
 
         {page==="auth"         && <AuthPage onSuccess={handleAuthSuccess} currentUser={user}/>}
         {page==="home"         && <HomePage user={user} onLogout={handleLogout} onMenuOpen={()=>setSidebarOpen(true)} onStart={()=>{ setDraft(null); setPage("booking"); }}/>}
-        {page==="booking"      && <BookingPage user={user} onLogout={handleLogout} onMenuOpen={()=>setSidebarOpen(true)} bookedSlots={bookedSlots} onConfirm={handleConfirm} draft={draft}/>}
-        {(page==="confirmation"||page==="myBooking") && <ConfirmationPage booking={activeBooking} user={user} onLogout={handleLogout} onMenuOpen={()=>setSidebarOpen(true)} onRestart={()=>setPage("home")} onCancel={()=>setPage("home")}/>}
+        {page==="booking"      && <BookingPage user={user} onLogout={handleLogout} onMenuOpen={()=>setSidebarOpen(true)} bookedSlots={bookedSlots} onConfirm={handleConfirm} draft={draft} existingSlot={draft?`${draft.date}_${draft.time}`:null}/>}
+        {(page==="confirmation"||page==="myBooking") && <ConfirmationPage booking={activeBooking} user={user} onLogout={handleLogout} onMenuOpen={()=>setSidebarOpen(true)} onRestart={()=>setPage("home")} onEdit={handleEdit} onCancel={handleCancel}/>}
         {page==="noBooking"    && <NoBookingPage user={user} onLogout={handleLogout} onMenuOpen={()=>setSidebarOpen(true)} onBack={()=>setPage("home")}/>}
       </div>
     </div>
   );
-        }
+}
+
+// ── AuthPage ──────────────────────────────────────────────────────────────────
 function AuthPage({ onSuccess, currentUser }) {
   const [mode,  setMode]  = useState("register");
   const [reg,   setReg]   = useState({ full_name:"", phone:"", email:"", password:"", confirm:"" });
@@ -316,15 +403,15 @@ function AuthPage({ onSuccess, currentUser }) {
   function doRegister() {
     setError("");
     if (!reg.full_name.trim())        { setError("Preencha o nome completo."); return; }
-    if (!isValidPhone(reg.phone))     { setError("Telefone inválido."); return; }
-    if (!isValidEmail(reg.email))     { setError("E-mail inválido."); return; }
+    if (!isValidPhone(reg.phone))     { setError("Telefone não existente ou inválido."); return; }
+    if (!isValidEmail(reg.email))     { setError("E-mail não existente ou inválido."); return; }
     
     const currentUsers = getUsersFromStorage();
-    if (currentUsers.find(u => u.email === reg.email)) { setError("E-mail já cadastrado."); return; }
+    if (currentUsers.find(u=>u.email===reg.email)) { setError("E-mail já cadastrado."); return; }
     if (!reg.password)                { setError("Preencha a senha."); return; }
-    if (reg.password !== reg.confirm)   { setError("As senhas não coincidem."); return; }
+    if (reg.password!==reg.confirm)   { setError("As senhas não coincidem."); return; }
     
-    const nu = { full_name: reg.full_name, phone: reg.phone, email: reg.email, password: reg.password };
+    const nu = { full_name:reg.full_name, phone:reg.phone, email:reg.email, password:reg.password, role:"client" };
     try {
       localStorage.setItem(USERS_KEY, JSON.stringify([...currentUsers, nu]));
     } catch {}
@@ -337,9 +424,9 @@ function AuthPage({ onSuccess, currentUser }) {
     if (!log.password) { setError("Preencha a senha."); return; }
     
     const currentUsers = getUsersFromStorage();
-    const found = currentUsers.find(u => u.email === log.email);
+    const found = currentUsers.find(u=>u.email===log.email);
     if (!found)                          { setError("E-mail não cadastrado."); return; }
-    if (found.password !== log.password)   { setError("Senha incorreta."); return; }
+    if (found.password!==log.password)   { setError("Senha incorreta."); return; }
     onSuccess(found);
   }
 
@@ -350,30 +437,48 @@ function AuthPage({ onSuccess, currentUser }) {
           <div className="flex flex-col justify-between gap-8 p-8 bg-black/30 border-b md:border-b-0 md:border-r border-zinc-800 text-left">
             <div className="space-y-5">
               <LogoWithText/>
-              <h1 className="text-3xl font-extrabold text-white leading-tight">Agende sua lavagem de estofados em minutos.</h1>
-              <p className="text-zinc-400 text-sm">Atendimento profissional com sistema simples.</p>
+              <h1 className="text-3xl sm:text-4xl font-extrabold text-white leading-tight">Agende sua lavagem de estofados em minutos.</h1>
+              <p className="text-zinc-400 text-sm leading-relaxed">Atendimento profissional com sistema simples: cadastro, escolha do serviço e confirmação.</p>
+            </div>
+            <div className="bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-300">
+              ✔️ Processo otimizado para celular, tablet e computador.
             </div>
           </div>
+
           <div className="p-8 text-left">
             <h2 className="text-xl font-bold text-white mb-5">{mode==="register"?"Criar conta":"Entrar na conta"}</h2>
             <div className="grid grid-cols-2 gap-2 mb-6">
-              <button onClick={()=>{ setMode("register"); setError(""); }} className={`py-2 rounded-lg text-sm font-semibold ${mode==="register"?"bg-red-600 text-white":"bg-zinc-800 text-zinc-300"}`}>Cadastrar</button>
-              <button onClick={()=>{ setMode("login"); setError(""); }} className={`py-2 rounded-lg text-sm font-semibold ${mode==="login"?"bg-red-600 text-white":"bg-zinc-800 text-zinc-300"}`}>Já tenho conta</button>
+              {[["register","Cadastrar"],["login","Já tenho conta"]].map(([m,label])=>(
+                <button key={m} onClick={()=>{ setMode(m); setError(""); }}
+                  className={`py-2 rounded-lg text-sm font-semibold transition-colors cursor-pointer ${mode===m?"bg-red-600 text-white":"bg-zinc-800 text-zinc-300 border border-zinc-700 hover:bg-zinc-700"}`}>
+                  {label}
+                </button>
+              ))}
             </div>
+
             {mode==="register" ? (
               <div className="space-y-3">
-                <input type="text" placeholder="Nome completo" value={reg.full_name} onChange={upd("full_name")} className={inputCls}/>
-                <input type="tel" placeholder="Telefone" value={reg.phone} onChange={upd("phone")} className={inputCls}/>
-                <input type="email" placeholder="Email" value={reg.email} onChange={upd("email")} className={inputCls}/>
-                <input type="password" placeholder="Senha" value={reg.password} onChange={upd("password")} className={inputCls}/>
-                <input type="password" placeholder="Confirmar senha" value={reg.confirm} onChange={upd("confirm")} className={inputCls}/>
-                <ErrorMsg msg={error}/><button onClick={doRegister} className={`${btnRed} w-full py-3 mt-2`}>Cadastrar</button>
+                {[["Nome completo","full_name","text","Digite seu nome"],["Telefone / WhatsApp","phone","tel","(85) 99999-9999"],["Email","email","email","seu@email.com"],["Senha","password","password",""],["Confirmar senha","confirm","password",""]].map(([label,k,type,ph])=>(
+                  <div key={k} className="flex flex-col gap-1">
+                    <label className="text-xs font-medium text-zinc-400">{label}</label>
+                    <input type={type} placeholder={ph} value={reg[k]} onChange={upd(k)} className={inputCls}/>
+                  </div>
+                ))}
+                <ErrorMsg msg={error}/>
+                <button onClick={doRegister} className={`${btnRed} w-full py-3 mt-2`}>Cadastrar</button>
               </div>
             ) : (
               <div className="space-y-3">
-                <input type="email" placeholder="Email" value={log.email} onChange={updL("email")} className={inputCls}/>
-                <input type="password" placeholder="Senha" value={log.password} onChange={updL("password")} className={inputCls}/>
-                <ErrorMsg msg={error}/><button onClick={doLogin} className={`${btnRed} w-full py-3 mt-2`}>Entrar</button>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium text-zinc-400">Email</label>
+                  <input type="email" placeholder="seu@email.com" value={log.email} onChange={updL("email")} className={inputCls}/>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium text-zinc-400">Senha</label>
+                  <input type="password" value={log.password} onChange={updL("password")} className={inputCls}/>
+                </div>
+                <ErrorMsg msg={error}/>
+                <button onClick={doLogin} className={`${btnRed} w-full py-3 mt-2`}>Entrar</button>
               </div>
             )}
           </div>
@@ -383,119 +488,378 @@ function AuthPage({ onSuccess, currentUser }) {
   );
 }
 
+// ── HomePage ──────────────────────────────────────────────────────────────────
 function HomePage({ user, onLogout, onStart, onMenuOpen }) {
   return (
     <div className="min-h-screen px-4 py-6 flex flex-col justify-between">
       <div className="max-w-5xl mx-auto w-full">
         <Header user={user} onLogout={onLogout} onMenuOpen={onMenuOpen}/>
-        <div className="flex flex-col items-center justify-center min-h-[60vh] text-center max-w-3xl mx-auto">
-          <div className="mb-6"><LogoWithText/></div>
-          <h1 className="text-4xl font-extrabold text-white leading-tight mb-4">Agende sua lavagem de estofados em minutos.</h1>
-          <button onClick={onStart} className={`${btnRed} px-10 py-4 text-lg shadow-lg`}>Começar o agendamento →</button>
-        </div><Footer/>
+        <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4 max-w-3xl mx-auto">
+          <Logo size={80}/>
+          <h1 className="text-4xl sm:text-5xl font-extrabold text-white leading-tight mt-8 mb-4">Agende sua lavagem de estofados em minutos.</h1>
+          <p className="text-zinc-400 text-base sm:text-lg mb-10">Atendimento profissional com sistema simples.</p>
+          <button onClick={onStart} className={`${btnRed} px-10 py-4 text-lg shadow-lg shadow-red-900/40`}>Começar o agendamento →</button>
+        </div>
+        <Footer/>
       </div>
     </div>
   );
 }
 
-function BookingPage({ user, onLogout, onMenuOpen, bookedSlots, onConfirm, draft }) {
-  const [step, setStep] = useState(1);
-  const [items, setItems] = useState([{ upholstery:"", tipoSel:"", tipoCustom:"", m2:"" }]);
-  const [service, setService] = useState("");
-  const [loc, setLoc] = useState({ address:"", neighborhood:"", city:"", date:"", time:"" });
+// ── BookingPage ───────────────────────────────────────────────────────────────
+const emptyItem = () => ({ upholstery:"", tipoSel:"", tipoCustom:"", m2:"" });
+
+function ItemCard({ item, index, total, onChange, onRemove }) {
+  const data    = UPHOLSTERY.find(u=>u.value===item.upholstery);
+  const isTapete = item.upholstery==="Tapete";
+
+  return (
+    <div className="bg-zinc-800/60 border border-zinc-700 rounded-2xl p-4 space-y-4 text-left">
+      <div className="flex items-center justify-between">
+        <span className="text-sm font-bold text-white">Estofado {index+1}</span>
+        {total>1 && (
+          <button onClick={()=>onRemove(index)}
+            className="text-xs text-red-400 hover:text-red-300 border border-red-700/40 rounded-lg px-2 py-1 transition-colors cursor-pointer">
+            ✕ Remover
+          </button>
+        )}
+      </div>
+
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+        {UPHOLSTERY.map(u=>(
+          <button key={u.value}
+            onClick={()=>onChange(index,{ upholstery:u.value, tipoSel:"", tipoCustom:"", m2:"" })}
+            className={`flex flex-col items-center justify-center gap-2 p-3 rounded-xl border text-center text-xs font-semibold transition-colors cursor-pointer
+              ${item.upholstery===u.value
+                ?"border-red-500 bg-red-600/10 text-white"
+                :"border-zinc-700 bg-zinc-900/60 text-zinc-400 hover:border-zinc-500"}`}>
+            {u.value === "Poltrona"
+              ? <img src={POLTRONA_B64} alt="Poltrona" style={{width:24,height:24,objectFit:"contain",filter:"brightness(0.9)"}}/>
+              : <span className="text-xl">{u.icon}</span>
+            }
+            {u.value}
+          </button>
+        ))}
+      </div>
+
+      {data && isTapete && (
+        <div>
+          <label className="text-xs font-medium text-zinc-400 block mb-1">Metragem (m²)</label>
+          <input type="number" min="0" placeholder="Ex: 4" value={item.m2}
+            onChange={e=>onChange(index,{ m2:e.target.value })} className={inputCls}/>
+        </div>
+      )}
+
+      {data && !isTapete && (
+        <div>
+          <label className="text-xs font-medium text-zinc-400 block mb-2">Tipo</label>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {data.tipos.map(t=>(
+              <div key={t} className="w-full">
+                <button onClick={()=>onChange(index,{ tipoSel:t, tipoCustom:"" })}
+                  className={`w-full text-left px-3 py-2 rounded-lg border text-xs font-semibold transition-colors cursor-pointer
+                    ${item.tipoSel===t
+                      ?"border-red-500 bg-red-600/10 text-white"
+                      :"border-zinc-700 bg-zinc-900/60 text-zinc-400 hover:border-zinc-500"}`}>
+                  {t}
+                </button>
+                {t==="Outro" && item.tipoSel==="Outro" && (
+                  <input type="text" placeholder="Descreva o modelo..." value={item.tipoCustom}
+                    onChange={e=>onChange(index,{ tipoCustom:e.target.value })}
+                    className={inputCls+" mt-1 text-xs"}/>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function BookingPage({ user, onLogout, onMenuOpen, bookedSlots, onConfirm, draft, existingSlot }) {
+  const [step,    setStep]    = useState(1);
+  const [items,   setItems]   = useState(draft?.items || [emptyItem()]);
+  const [service, setService] = useState(draft?.service_type||"");
+  const [loc,     setLoc]     = useState({
+    address:      draft?.address||"",
+    neighborhood: draft?.neighborhood||"",
+    city:         draft?.city||"",
+    date:         draft?.date||"",
+    time:         draft?.time||"",
+  });
   const [error, setError] = useState("");
 
   const updLoc = k=>e=>setLoc(p=>({...p,[k]:e.target.value}));
-  const availTimes = getAvailableTimes(loc.date, bookedSlots);
+  const effectiveBooked = existingSlot ? bookedSlots.filter(s=>s!==existingSlot) : bookedSlots;
+  const availTimes = getAvailableTimes(loc.date, effectiveBooked);
+
+  function changeItem(index, patch) { setItems(p=>p.map((it,i)=>i===index?{...it,...patch}:it)); setError(""); }
+  function removeItem(index)        { setItems(p=>p.filter((_,i)=>i!==index)); }
+  function addItem()                { setItems(p=>[...p, emptyItem()]); }
+
+  function goStep2() {
+    setError("");
+    for (let i=0;i<items.length;i++) {
+      const it=items[i], n=i+1;
+      if (!it.upholstery)                              { setError(`Estofado ${n}: selecione o tipo de estofado.`); return; }
+      if (it.upholstery==="Tapete"&&!it.m2.trim())    { setError(`Estofado ${n}: informe a metragem (m²).`); return; }
+      if (it.upholstery!=="Tapete"&&!it.tipoSel)      { setError(`Estofado ${n}: selecione o tipo.`); return; }
+      if (it.tipoSel==="Outro"&&!it.tipoCustom.trim()){ setError(`Estofado ${n}: descreva o tipo.`); return; }
+    }
+    setStep(2);
+  }
+  function goStep3() {
+    setError("");
+    if (!service) { setError("Selecione o tipo de atendimento."); return; }
+    setStep(3);
+  }
+  function submit() {
+    setError("");
+    if (!loc.address.trim())      { setError("Preencha o endereço."); return; }
+    if (!loc.neighborhood.trim()) { setError("Preencha o bairro."); return; }
+    if (!loc.city.trim())         { setError("Preencha a cidade."); return; }
+    if (!loc.date)                { setError("Selecione a data."); return; }
+    if (!loc.time)                { setError("Selecione o horário."); return; }
+    const itemsFinal = items.map(it=>({
+      upholstery_type: it.upholstery,
+      tipo: it.upholstery==="Tapete" ? `${it.m2} m²` : (it.tipoSel==="Outro"?it.tipoCustom:it.tipoSel),
+    }));
+    onConfirm({ items:itemsFinal, service_type:service, ...loc }, `${loc.date}_${loc.time}`);
+  }
+
+  const isWeekend = loc.date && [0,6].includes(new Date(loc.date+"T00:00:00").getDay());
 
   return (
     <div className="min-h-screen px-4 py-6 flex flex-col justify-between">
       <div className="max-w-3xl mx-auto w-full text-left">
         <Header user={user} onLogout={onLogout} onMenuOpen={onMenuOpen}/>
-        <StepChips current={step}/>
+        <div className="mb-6">
+          <h1 className="text-3xl sm:text-4xl font-extrabold text-white leading-tight">Agendamento de Lavagem</h1>
+          <p className="text-zinc-400 text-sm mt-2">Escolha os estofados, o tipo de atendimento, informe sua localização e confirme seu horário.</p>
+          <div className="mt-5"><StepChips current={step}/></div>
+        </div>
+
         {step===1 && (
-          <div className={cardCls}>
-            <h2 className="text-lg font-bold text-white mb-4">1) Escolha o que deseja lavar:</h2>
-            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mb-4">
-              {UPHOLSTERY.map(u=>(
-                <button key={u.value} onClick={()=>setItems([{upholstery:u.value, tipoSel:u.tipos?u.tipos[0]:"", tipoCustom:"", m2:""}])}
-                  className={`flex flex-col items-center justify-center gap-2 p-4 rounded-xl border text-sm font-bold transition-all ${items[0].upholstery===u.value?"border-red-500 bg-red-600/10 text-white":"border-zinc-800 bg-zinc-900/40 text-zinc-400"}`}>
-                  <div className="w-10 h-10 flex items-center justify-center text-xl mb-1">{u.icon}</div>{u.value}
-                </button>
-              ))}
+          <div className="space-y-4">
+            <div className={cardCls}>
+              <div className="flex items-center justify-between mb-5">
+                <h2 className="text-lg font-bold text-white">1) Selecione os estofados</h2>
+                <span className="text-xs text-zinc-400 bg-zinc-800 border border-zinc-700 rounded-full px-3 py-1">
+                  {items.length} item{items.length>1?"s":""}
+                </span>
+              </div>
+              <div className="space-y-4">
+                {items.map((item,i)=>(
+                  <ItemCard key={i} item={item} index={i} total={items.length} onChange={changeItem} onRemove={removeItem}/>
+                ))}
+              </div>
+              <button onClick={addItem}
+                className="mt-4 w-full border border-dashed border-zinc-700 hover:border-red-500 text-zinc-400 hover:text-red-400 rounded-2xl py-4 text-sm font-semibold transition-colors cursor-pointer">
+                + Adicionar outro estofado
+              </button>
             </div>
-            <button onClick={()=>items[0].upholstery?setStep(2):setError("Selecione um item.")} className={`${btnRed} px-6 py-2.5 mt-4`}>Continuar →</button>
             <ErrorMsg msg={error}/>
+            <button onClick={goStep2} className={`${btnRed} px-8 py-3 mt-2`}>Continuar →</button>
           </div>
         )}
+
         {step===2 && (
-          <div className={cardCls}>
-            <h2 className="text-lg font-bold text-white mb-4">2) Tipo de atendimento:</h2>
-            <div className="grid sm:grid-cols-2 gap-4">
-              {SERVICES.map(s=>(
-                <button key={s.value} onClick={()=>setService(s.value)} className={`p-6 rounded-2xl border text-left ${service===s.value?"border-red-500 bg-red-600/10":"border-zinc-800"}`}>
-                  <span className="text-3xl block mb-2">{s.icon}</span><p className="text-white font-bold">{s.value}</p>
-                </button>
-              ))}
+          <div>
+            <div className={cardCls}>
+              <h2 className="text-lg font-bold text-white mb-5">2) Como você deseja realizar o serviço?</h2>
+              <div className="grid md:grid-cols-2 gap-4 mb-4">
+                {SERVICES.map(s=>(
+                  <button key={s.value} onClick={()=>{ setService(s.value); setError(""); }}
+                    className={`p-6 rounded-2xl border text-left transition-colors cursor-pointer ${service===s.value?"border-red-500 bg-red-600/10":"border-zinc-800 bg-zinc-900/40 hover:border-zinc-600"}`}>
+                    <div className="text-4xl mb-4">{s.icon}</div>
+                    <p className="text-white font-bold text-base m-0">{s.value}</p>
+                    <p className="text-zinc-400 text-sm mt-2 m-0">{s.desc}</p>
+                  </button>
+                ))}
+              </div>
+              <ErrorMsg msg={error}/>
             </div>
-            <button onClick={()=>service?setStep(3):setError("Escolha o serviço.")} className={`${btnRed} px-6 py-2.5 mt-6`}>Continuar →</button>
-            <ErrorMsg msg={error}/>
+            <div className="flex gap-3 mt-5">
+              <button onClick={()=>{ setStep(1); setError(""); }} className={`${btnGhost} px-5 py-2.5`}>← Voltar</button>
+              <button onClick={goStep3} className={`${btnRed} px-6 py-2.5`}>Próximo →</button>
+            </div>
           </div>
         )}
+
         {step===3 && (
           <div className={cardCls}>
-            <h2 className="text-lg font-bold text-white mb-4">3) Agendamento:</h2>
-            <div className="space-y-3">
-              <input placeholder="Endereço" value={loc.address} onChange={updLoc("address")} className={inputCls}/>
-              <input placeholder="Bairro" value={loc.neighborhood} onChange={updLoc("neighborhood")} className={inputCls}/>
-              <input placeholder="Cidade" value={loc.city} onChange={updLoc("city")} className={inputCls}/>
-              <input type="date" value={loc.date} onChange={updLoc("date")} className={inputCls}/>
-              <select value={loc.time} onChange={updLoc("time")} className={inputCls}>
-                <option value="">Selecione o horário</option>
-                {availTimes.map(t=><option key={t} value={t}>{t}</option>)}
-              </select>
+          <h2 className="text-lg font-bold text-white mb-5">📍 3) Localização e Agendamento</h2>
+            <div className="space-y-4 max-w-lg">
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium text-zinc-400">Endereço completo</label>
+                <input className={inputCls} value={loc.address} onChange={updLoc("address")} placeholder="Rua, número, bloco"/>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium text-zinc-400">Bairro</label>
+                  <input className={inputCls} value={loc.neighborhood} onChange={updLoc("neighborhood")}/>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium text-zinc-400">Cidade</label>
+                  <input className={inputCls} value={loc.city} onChange={updLoc("city")}/>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium text-zinc-400">Data</label>
+                  <input type="date" className={inputCls} value={loc.date}
+                    onChange={e=>{ updLoc("date")(e); setLoc(p=>({...p,time:""})); }}/>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium text-zinc-400">Horário</label>
+                  <select className={inputCls} value={loc.time} onChange={updLoc("time")}>
+                    <option value="">Escolha um horário</option>
+                    {loc.date && availTimes.length===0 && <option disabled>Sem horários disponíveis</option>}
+                    {availTimes.map(t=><option key={t} value={t}>{t}</option>)}
+                  </select>
+                </div>
+              </div>
+              {isWeekend && <p className="text-xs text-zinc-500 m-0">🗓️ Sábados e domingos: atendimentos na parte da manhã.</p>}
             </div>
-            <button onClick={()=>{
-              if(!loc.address||!loc.date||!loc.time) { setError("Preencha todos os campos."); return; }
-              onConfirm({ items:[{upholstery_type:items[0].upholstery, tipo:"Padrão"}], service_type:service, ...loc }, `${loc.date}_${loc.time}`);
-            }} className={`${btnRed} px-6 py-2.5 mt-6`}>Finalizar Agendamento</button>
             <ErrorMsg msg={error}/>
+            <div className="flex gap-3 mt-6">
+              <button onClick={()=>{ setStep(2); setError(""); }} className={`${btnGhost} px-5 py-2.5`}>← Voltar</button>
+              <button onClick={submit} className={`${btnRed} px-6 py-2.5`}>Confirmar Agendamento</button>
+            </div>
           </div>
-        )}<Footer/>
+        )}
+
+        <Footer/>
       </div>
     </div>
   );
 }
 
-function ConfirmationPage({ booking, user, onLogout, onMenuOpen, onRestart }) {
+// ── ConfirmationPage ──────────────────────────────────────────────────────────
+function ConfirmationPage({ booking, user, onLogout, onMenuOpen, onRestart, onEdit, onCancel }) {
+  const [contactOpen,      setContactOpen]      = useState(false);
+  const [showCancelConfirm,setShowCancelConfirm] = useState(false);
+  if (!booking) return null;
+
+  const isCanceled  = booking.status === "cancelado";
+  const isAltered   = booking.status === "alterado";
+  const isConcluded = booking.status === "concluido";
+  const itemsList = booking.items || [];
+  const itemsStr  = itemsList.map(it=>`${it.upholstery_type} (${it.tipo})`).join(", ");
+  const waMsg     = encodeURIComponent(`Olá, gostaria de fazer um orçamento para lavagem de ${itemsStr} na L2 Lavagem a Seco.`);
+
   return (
     <div className="min-h-screen px-4 py-6 flex flex-col justify-between">
+      <ContactModal open={contactOpen} onClose={()=>setContactOpen(false)}/>
       <div className="max-w-2xl mx-auto w-full text-left">
         <Header user={user} onLogout={onLogout} onMenuOpen={onMenuOpen}/>
         <div className={cardCls}>
-          <h2 className="text-2xl font-extrabold text-green-400 mb-4">✅ Agendamento Confirmado!</h2>
-          <div className="bg-zinc-800/60 p-4 rounded-xl space-y-2 text-sm mb-6">
-            <p className="text-white"><strong>Item:</strong> {booking?.items?.[0]?.upholstery_type}</p>
-            <p className="text-white"><strong>Atendimento:</strong> {booking?.service_type}</p>
-            <p className="text-white"><strong>Local:</strong> {booking?.address}, {booking?.neighborhood}</p>
-            <p className="text-white"><strong>Horário:</strong> {booking?.date} às {booking?.time}</p>
+          <h2 className="text-xl sm:text-2xl font-extrabold text-white mb-4">
+            {isCanceled?"🚫 Agendamento Cancelado":isAltered?"⚠️ Agendamento Alterado":isConcluded?"✔ Serviço Concluído":"✅ Agendamento Confirmado"}
+          </h2>
+
+          {isCanceled && (
+            <div className="bg-red-900/25 border border-red-500/40 rounded-xl px-4 py-3 text-red-300 text-sm font-semibold mb-5">
+              Este agendamento foi cancelado pela empresa. Entre em contato para mais informações.
+            </div>
+          )}
+          {isAltered && (
+            <div className="bg-yellow-900/25 border border-yellow-500/40 rounded-xl px-4 py-3 text-yellow-300 text-sm font-semibold mb-5">
+              ⚠️ A empresa alterou seu agendamento. Confira os novos dados abaixo.
+            </div>
+          )}
+          {!isCanceled && !isAltered && !isConcluded && (
+            <div className="bg-green-900/20 border border-green-500/30 rounded-xl px-4 py-3 text-green-300 text-sm font-semibold mb-5">
+              Seu serviço foi agendado com sucesso!
+            </div>
+          )}
+          {isConcluded && (
+            <div className="bg-green-900/25 border border-green-500/40 rounded-xl px-4 py-3 text-green-300 text-sm font-semibold mb-5">
+              ✔ Serviço concluído. Obrigado por escolher a L2 Lavagem a Seco!
+            </div>
+          )}
+
+          <div className="bg-zinc-800/60 border border-zinc-700 rounded-xl p-5 space-y-4 text-sm mb-6">
+            <div>
+              <p className="text-white font-semibold mb-2">Estofados ({itemsList.length}):</p>
+              <div className="space-y-1 pl-2">
+                {itemsList.map((it,i)=>(
+                  <p key={i} className="text-zinc-300 m-0">
+                    <span className="text-zinc-500 mr-1">{i+1}.</span>
+                    <strong className="text-white">{it.upholstery_type}</strong> — {it.tipo}
+                  </p>
+                ))}
+              </div>
+            </div>
+            <div className="border-t border-zinc-700 pt-3 space-y-2">
+              {[
+                ["Tipo de atendimento", booking.service_type],
+                ["Endereço",           `${booking.address}, ${booking.neighborhood}, ${booking.city}`],
+                ["Data e horário",     `${booking.date} às ${booking.time}`],
+              ].map(([label,value])=>(
+                <p key={label} className="text-zinc-300 m-0"><strong className="text-white">{label}:</strong> {value}</p>
+              ))}
+            </div>
           </div>
-          <button onClick={onRestart} className={`${btnGhost} px-6 py-3`}>Voltar ao Início</button>
-        </div><Footer/>
+
+          <div className="flex flex-wrap gap-3 mb-4">
+            <a href={`https://wa.me/${WA_NUMBER}?text=${waMsg}`} target="_blank" rel="noreferrer"
+              className="bg-green-700 hover:bg-green-600 text-white font-bold px-5 py-3 rounded-xl text-sm transition-colors text-center justify-center inline-block">
+              💬 Orçamento pelo WhatsApp
+            </a>
+            <button onClick={()=>setContactOpen(true)}
+              className="bg-zinc-700 hover:bg-zinc-600 text-white font-bold px-5 py-3 rounded-xl text-sm transition-colors cursor-pointer">
+              📞 Orçamento pelo Telefone
+            </button>
+            <button onClick={onRestart} className={`${btnGhost} px-5 py-3`}>Voltar ao Início</button>
+          </div>
+
+          {!isCanceled && !isConcluded && (
+            <div className="flex flex-wrap gap-3 pt-4 border-t border-zinc-800">
+              <button onClick={onEdit}
+                className="bg-zinc-800 border border-zinc-700 hover:bg-zinc-700 text-zinc-300 font-semibold px-5 py-2.5 rounded-xl text-sm transition-colors cursor-pointer">
+                ✏️ Editar Agendamento
+              </button>
+              <button onClick={()=>setShowCancelConfirm(true)}
+                className="bg-red-900/30 border border-red-700/50 hover:bg-red-900/60 text-red-400 font-semibold px-5 py-2.5 rounded-xl text-sm transition-colors cursor-pointer">
+                🗑️ Cancelar Agendamento
+              </button>
+            </div>
+          )}
+
+          {showCancelConfirm && (
+            <div className="mt-4 bg-zinc-800 border border-zinc-700 rounded-xl p-4">
+              <p className="text-white text-sm font-semibold mb-3">Tem certeza que deseja cancelar?</p>
+              <div className="flex gap-3">
+                <button onClick={onCancel} className={`${btnRed} px-4 py-2`}>Sim, cancelar</button>
+                <button onClick={()=>setShowCancelConfirm(false)} className={`${btnGhost} px-4 py-2`}>Não, manter</button>
+              </div>
+            </div>
+          )}
+        </div>
+        <Footer/>
       </div>
     </div>
   );
 }
 
+// ── NoBookingPage ─────────────────────────────────────────────────────────────
 function NoBookingPage({ user, onLogout, onMenuOpen, onBack }) {
   return (
-    <div className="min-h-screen px-4 py-6"><div className="max-w-5xl mx-auto">
-      <Header user={user} onLogout={onLogout} onMenuOpen={onMenuOpen}/>
-      <div className={`${cardCls} max-w-md mx-auto text-center mt-10`}>
-        <p className="text-white font-bold mb-4">Nenhum agendamento ativo.</p>
-        <button onClick={onBack} className={`${btnRed} px-6 py-2`}>Voltar</button>
+    <div className="min-h-screen px-4 py-6 flex flex-col justify-between">
+      <div className="max-w-5xl mx-auto w-full">
+        <Header user={user} onLogout={onLogout} onMenuOpen={onMenuOpen}/>
+        <div className="max-w-md mx-auto mt-16 text-center">
+          <div className={cardCls}>
+            <p className="text-3xl mb-4 m-0">📋</p>
+            <p className="text-white font-bold text-lg mb-2 m-0">Nenhum agendamento feito</p>
+            <p className="text-zinc-400 text-sm mb-6 m-0">Você ainda não possui agendamentos ativos.</p>
+            <button onClick={onBack} className={`${btnRed} px-6 py-3`}>← Voltar</button>
+          </div>
+        </div>
+        <Footer/>
       </div>
-    </div></div>
+    </div>
   );
-    }
-          
+                  }
